@@ -6,8 +6,42 @@
 
 - JDK 17+
 - Maven 3.6+
+- Docker / Docker Compose（本地 MySQL、Redis 用）
 
-## 启动
+## 启动本地 MySQL + Redis
+
+```bash
+docker compose up -d
+```
+
+查看状态：
+
+```bash
+docker compose ps
+```
+
+连接信息（仅本地学习用）：
+
+| 服务 | 地址 | 账号 / 说明 |
+| --- | --- | --- |
+| MySQL | `localhost:3306` | 库名 `java_demo`；用户 `demo` / 密码 `demo`；root 密码 `root` |
+| Redis | `localhost:6379` | 无密码 |
+
+常用命令：
+
+```bash
+# 看日志
+docker compose logs -f mysql
+docker compose logs -f redis
+
+# 停容器（数据还在）
+docker compose down
+
+# 停容器并删除数据卷
+docker compose down -v
+```
+
+## 启动 Spring Boot
 
 ```bash
 mvn spring-boot:run
@@ -29,6 +63,7 @@ Hello World
 
 ```text
 java-demo/
+├── docker-compose.yml      # 本地 MySQL + Redis
 ├── pom.xml                 # Maven 配置（≈ package.json）
 ├── .gitignore              # Git 忽略规则
 ├── README.md               # 本说明文档
@@ -39,6 +74,7 @@ java-demo/
 
 | 文件 | 作用 | 前端类比 |
 | --- | --- | --- |
+| [`docker-compose.yml`](docker-compose.yml) | 一键拉起本地 MySQL、Redis 容器，并映射端口到本机。 | 本地起依赖服务的 compose（类似前端本地起 mock DB） |
 | [`pom.xml`](pom.xml) | 声明项目信息、依赖、Java 版本、打包插件。Maven 根据它下载依赖并构建。 | `package.json` + 部分构建配置 |
 | [`.gitignore`](.gitignore) | 告诉 Git 不要提交 `target/`（编译产物）、IDE 配置等。 | 前端项目里的 `.gitignore` |
 | [`DemoApplication.java`](src/main/java/com/example/demo/DemoApplication.java) | `main` 方法所在类；运行后启动 Spring Boot 和内嵌 Tomcat（默认 8080）。 | `server.js` / `main.ts` |
