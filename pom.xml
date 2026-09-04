@@ -1,9 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  pom.xml = 项目的 package.json + 部分 webpack/vite 配置。
+  Maven 用它管理：依赖、JDK 版本、打包方式。
+-->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
+    <!-- parent：继承 Spring Boot 官方父 POM，自动管理依赖版本（类似开箱的依赖版本锁） -->
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
@@ -11,6 +16,7 @@
         <relativePath/>
     </parent>
 
+    <!-- 本项目的坐标：groupId + artifactId + version ≈ npm 的 name + version -->
     <groupId>com.example</groupId>
     <artifactId>java-demo</artifactId>
     <version>0.0.1-SNAPSHOT</version>
@@ -18,10 +24,15 @@
     <description>Spring Boot Hello World</description>
 
     <properties>
+        <!-- 编译用的 Java 版本，类似 engines.node -->
         <java.version>17</java.version>
     </properties>
 
     <dependencies>
+        <!--
+          starter-web：一键引入 Web 开发所需依赖（Spring MVC、内嵌 Tomcat、JSON 等）。
+          类似 npm install express，但 Spring 的 starter 会拉一整套配套库。
+        -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
@@ -30,6 +41,7 @@
 
     <build>
         <plugins>
+            <!-- 把项目打成可执行 jar（java -jar xxx.jar 就能跑），类似打包成可运行产物 -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
