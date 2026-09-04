@@ -16,6 +16,8 @@ services:
       MYSQL_PASSWORD: demo
     volumes:
       - mysql_data:/var/lib/mysql
+      # 仅在数据卷首次初始化时自动执行；已有数据请手动跑一遍 SQL（见 README）
+      - ./sql/init-demo-sample.sql:/docker-entrypoint-initdb.d/01-init-demo-sample.sql:ro
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
