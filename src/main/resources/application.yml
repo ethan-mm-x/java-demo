@@ -1,0 +1,30 @@
+# application.yml ≈ 前端的 .env + 部分运行时配置
+# Spring Boot 启动时自动读取 src/main/resources/ 下的这个文件
+
+server:
+  port: 8080
+
+spring:
+  datasource:
+    # 对应 docker-compose.yml 里的 MySQL 连接信息
+    # characterEncoding 用 UTF-8；加 connectionCollation 避免中文读写变成乱码
+    url: jdbc:mysql://localhost:3306/java_demo?useUnicode=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci&serverTimezone=Asia/Shanghai
+    username: demo
+    password: demo
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    # 打开 SQL 日志，方便学习时对照“Java 方法 → 实际 SQL”
+    show-sql: true
+    hibernate:
+      # validate：启动时校验 Entity 与表结构是否一致，不自动改表（学习阶段更安全）
+      # 可选：update / create / create-drop（生产慎用）
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+
+# 日志里把 Hibernate SQL 绑参也打出来（? 对应的真实参数）
+logging:
+  level:
+    org.hibernate.orm.jdbc.bind: trace

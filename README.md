@@ -1,6 +1,6 @@
 # java-demo
 
-面向前端同学的 Spring Boot Hello World 示例：用最少文件跑通一个 HTTP 接口。
+面向前端同学的 Spring Boot 学习项目：Hello World + MySQL 增删改查（CRUD）。
 
 ## 环境要求
 
@@ -43,7 +43,7 @@ docker compose down -v
 
 ### 学习测试表 `demo_sample`
 
-库 `java_demo` 里有一张字段较全的样例表，方便后期练增删改查。建表脚本：[`sql/init-demo-sample.sql`](sql/init-demo-sample.sql)。
+库 `java_demo` 里有一张字段较全的样例表，方便练增删改查。建表脚本：[`sql/init-demo-sample.sql`](sql/init-demo-sample.sql)。
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
@@ -52,9 +52,9 @@ docker compose down -v
 | `name` | VARCHAR(100) | 名称 |
 | `status` | TINYINT | 0草稿 / 1启用 / 2禁用 |
 | `score` | DECIMAL(10,2) | 分数或金额 |
-| `is_vip` | TINYINT(1) | 是否 VIP |
+| `is_vip` | TINYINT(1) | 是否 VIP（接口 JSON 字段名是 `vip`） |
 | `tags` | VARCHAR(255) | 标签字符串 |
-| `profile_json` | JSON | JSON 扩展字段 |
+| `profile_json` | JSON | JSON 扩展字段（接口里先当字符串传） |
 | `remark` | TEXT | 长文本 |
 | `birthday` | DATE | 日期 |
 | `last_login_at` | DATETIME | 最近登录 |
@@ -66,7 +66,7 @@ docker compose down -v
 docker compose exec -T mysql mysql -udemo -pdemo java_demo < sql/init-demo-sample.sql
 ```
 
-脚本可重复执行（`CREATE IF NOT EXISTS` + `INSERT IGNORE`）。在 dbx 里刷新后应能看到表和 5 行样例数据。
+脚本可重复执行（`CREATE IF NOT EXISTS` + `INSERT IGNORE`）。
 
 验证：
 
@@ -76,60 +76,122 @@ docker compose exec -T mysql mysql -udemo -pdemo java_demo -e "SELECT id, code, 
 
 ## 启动 Spring Boot
 
+先确保 MySQL 已 healthy，再启动：
+
 ```bash
 mvn spring-boot:run
 ```
 
 ## 验证
 
+### Hello World
+
 ```bash
 curl http://localhost:8080/hello
 ```
 
-期望输出：
+期望输出：`Hello World`
 
-```text
-Hello World
+### 样例 CRUD（`/api/samples`）
+
+```bash
+# 列表
+curl http://localhost:8080/api/samples
+
+# 按状态过滤
+curl 'http://localhost:8080/api/samples?status=1'
+
+# 详情
+curl http://localhost:8080/api/samples/1
+
+# 创建
+curl -X POST http://localhost:8080/api/samples \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "code": "U006",
+    "name": "Frank",
+    "status": 1,
+    "score": 66.6,
+    "vip": false,
+    "tags": "learning",
+    "profileJson": "{\"city\":\"Guangzhou\",\"level\":1}",
+    "remark": "新建一条练手数据",
+    "birthday": "2001-02-03",
+    "lastLoginAt": null
+  }'
+
+# 更新（把上面返回的 id 换进去）
+curl -X PUT http://localhost:8080/api/samples/6 \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "code": "U006",
+    "name": "Frank Updated",
+    "status": 2,
+    "score": 70.0,
+    "vip": true,
+    "tags": "learning,vip",
+    "profileJson": "{\"city\":\"Guangzhou\",\"level\":2}",
+    "remark": "更新后的备注",
+    "birthday": "2001-02-03",
+    "lastLoginAt": "2026-09-07T12:00:00"
+  }'
+
+# 删除
+curl -X DELETE http://localhost:8080/api/samples/6
 ```
 
 ## 项目结构（每个文件做什么）
 
 ```text
 java-demo/
-├── docker-compose.yml      # 本地 MySQL + Redis
-├── sql/
-│   └── init-demo-sample.sql # MySQL 学习测试表
-├── pom.xml                 # Maven 配置（≈ package.json）
-├── .gitignore              # Git 忽略规则
-├── README.md               # 本说明文档
-└── src/main/java/com/example/demo/
-    ├── DemoApplication.java   # 程序入口，启动内嵌服务器
-    └── HelloController.java   # 定义 GET /hello 接口
+├── docker-compose.yml
+├── sql/init-demo-sample.sql
+├── pom.xml
+├── README.md
+└── src/main/
+    ├── resources/
+    │   └── application.yml          # 数据源 / JPA 配置（≈ .env）
+    └── java/com/example/demo/
+        ├── DemoApplication.java     # 启动入口
+        ├── HelloController.java     # GET /hello
+        ├── GlobalExceptionHandler.java  # 统一错误 JSON
+        └── sample/                  # demo_sample 的 CRUD
+            ├── DemoSample.java           # Entity ↔ 表
+            ├── DemoSampleRepository.java # 数据访问
+            ├── DemoSampleRequest.java    # 请求体 DTO + 校验
+            ├── DemoSampleService.java    # 业务逻辑
+            └── DemoSampleController.java # HTTP 接口
 ```
 
 | 文件 | 作用 | 前端类比 |
 | --- | --- | --- |
-| [`docker-compose.yml`](docker-compose.yml) | 一键拉起本地 MySQL、Redis 容器，并映射端口到本机。 | 本地起依赖服务的 compose（类似前端本地起 mock DB） |
-| [`sql/init-demo-sample.sql`](sql/init-demo-sample.sql) | 在 `java_demo` 库建 `demo_sample` 表并插入样例数据。 | 本地 seed / migration SQL |
-| [`pom.xml`](pom.xml) | 声明项目信息、依赖、Java 版本、打包插件。Maven 根据它下载依赖并构建。 | `package.json` + 部分构建配置 |
-| [`.gitignore`](.gitignore) | 告诉 Git 不要提交 `target/`（编译产物）、IDE 配置等。 | 前端项目里的 `.gitignore` |
-| [`DemoApplication.java`](src/main/java/com/example/demo/DemoApplication.java) | `main` 方法所在类；运行后启动 Spring Boot 和内嵌 Tomcat（默认 8080）。 | `server.js` / `main.ts` |
-| [`HelloController.java`](src/main/java/com/example/demo/HelloController.java) | 用注解声明路由：`GET /hello` 返回字符串 `Hello World`。 | Express 的 `app.get('/hello', ...)` |
-| `target/`（本地生成，已忽略） | `mvn` 编译/打包后的 `.class`、`.jar` 等输出目录，不要提交。 | `dist/` / `build/` |
+| [`application.yml`](src/main/resources/application.yml) | 配置端口、MySQL 连接、JPA 行为 | `.env` + 部分 runtime config |
+| [`DemoSample.java`](src/main/java/com/example/demo/sample/DemoSample.java) | 表行 ↔ Java 对象 | Prisma model / TypeORM Entity |
+| [`DemoSampleRepository.java`](src/main/java/com/example/demo/sample/DemoSampleRepository.java) | 增删改查数据库 | Prisma Client / DAO |
+| [`DemoSampleService.java`](src/main/java/com/example/demo/sample/DemoSampleService.java) | 业务规则（唯一性、404） | NestJS Service |
+| [`DemoSampleController.java`](src/main/java/com/example/demo/sample/DemoSampleController.java) | 路由与请求/响应 | Express Router / NestJS Controller |
+| [`DemoSampleRequest.java`](src/main/java/com/example/demo/sample/DemoSampleRequest.java) | 入参形状 + 校验 | zod schema / Request DTO |
+| [`GlobalExceptionHandler.java`](src/main/java/com/example/demo/GlobalExceptionHandler.java) | 把异常转成统一 JSON | Express error middleware |
 
 ## 请求怎么走到代码里
 
 ```text
 浏览器/curl
-    │  GET http://localhost:8080/hello
+    │  GET/POST/PUT/DELETE  /api/samples...
     ▼
-内嵌 Tomcat（Spring Boot 自带）
+内嵌 Tomcat
     │
     ▼
-HelloController.hello()   ← @GetMapping("/hello")
+DemoSampleController   ← 路由 + @Valid 校验
     │
     ▼
-返回 "Hello World" 作为响应体
+DemoSampleService      ← 业务规则（code 唯一、找不到抛 404）
+    │
+    ▼
+DemoSampleRepository   ← Spring Data JPA 生成 SQL
+    │
+    ▼
+MySQL 表 demo_sample
 ```
 
 ## 和前端习惯的一点差异
@@ -137,3 +199,4 @@ HelloController.hello()   ← @GetMapping("/hello")
 - **先编译再运行**：改完 `.java` 要重新编译/重启（`mvn spring-boot:run`），不像 Node 热更新那么自然。
 - **注解代替手写注册**：路由、返回格式多靠 `@RestController`、`@GetMapping` 声明，而不是手动 `app.get`。
 - **包名即目录**：`package com.example.demo` 必须和文件夹路径 `com/example/demo` 一致。
+- **分层**：Controller 不直接操作数据库，先过 Service，再过 Repository（习惯，不是语法强制）。

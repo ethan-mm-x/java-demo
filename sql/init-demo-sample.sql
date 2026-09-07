@@ -3,6 +3,9 @@
 
 USE java_demo;
 
+-- 确保本脚本按 utf8mb4 读写，避免中文备注被二次编码成乱码
+SET NAMES utf8mb4;
+
 CREATE TABLE IF NOT EXISTS demo_sample (
     id              BIGINT          NOT NULL AUTO_INCREMENT COMMENT '主键',
     code            VARCHAR(32)     NOT NULL COMMENT '业务编码',
