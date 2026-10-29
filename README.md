@@ -82,6 +82,8 @@ docker compose exec -T mysql mysql -udemo -pdemo java_demo -e "SELECT id, code, 
 mvn spring-boot:run
 ```
 
+本仓库的 `.mvn/settings.xml` 会覆盖本机全局 Maven 镜像，改走阿里云公共仓库。否则全局配置里的公司 Nexus（`10.126.138.142`）不通时，会报 `Non-resolvable parent POM`。这只影响本项目，不改你机器上的全局 `settings.xml`。
+
 ## 验证
 
 ### Hello World
@@ -140,6 +142,72 @@ curl -X PUT http://localhost:8080/api/samples/6 \
 curl -X DELETE http://localhost:8080/api/samples/6
 ```
 
+### 国密算法（`/api/gm`）
+
+JDK 不带 SM2/SM3/SM4，本项目用 [BouncyCastle](https://www.bouncycastle.org/) 提供实现。密钥、密文、签名、摘要一律 **hex**；明文按 **UTF-8**。
+
+| 算法 | 角色 | 类比 |
+| --- | --- | --- |
+| SM2 | 非对称：公钥加密 / 私钥解密，私钥签名 / 公钥验签 | ECDSA + ECIES，曲线 `sm2p256v1` |
+| SM4 | 对称：同一把 128-bit 密钥加解密 | AES-128，这里用 CBC + PKCS5Padding |
+| SM3 | 摘要：任意输入 → 32 字节哈希 | SHA-256 |
+
+一键跑通（生成密钥、加解密、签名验签）：
+
+```bash
+curl http://localhost:8080/api/gm/demo
+```
+
+期望：`sm2.decryptOk`、`sm2.verified`、`sm4.decryptOk` 都是 `true`；`sm3.digest` 是 64 个 hex 字符。
+
+分步练习（把 demo 返回的密钥抄进 body）：
+
+```bash
+# SM2 密钥对
+curl -X POST http://localhost:8080/api/gm/sm2/keypair
+
+# SM2 加密 / 解密
+curl -X POST http://localhost:8080/api/gm/sm2/encrypt \
+  -H 'Content-Type: application/json' \
+  -d '{"publicKey":"<demo 里的 publicKey>","plaintext":"hello-国密"}'
+
+curl -X POST http://localhost:8080/api/gm/sm2/decrypt \
+  -H 'Content-Type: application/json' \
+  -d '{"privateKey":"<demo 里的 privateKey>","ciphertext":"<上一步的 ciphertext>"}'
+
+# SM2 签名 / 验签
+curl -X POST http://localhost:8080/api/gm/sm2/sign \
+  -H 'Content-Type: application/json' \
+  -d '{"privateKey":"<demo 里的 privateKey>","message":"hello-国密"}'
+
+curl -X POST http://localhost:8080/api/gm/sm2/verify \
+  -H 'Content-Type: application/json' \
+  -d '{"publicKey":"<demo 里的 publicKey>","message":"hello-国密","signature":"<上一步的 signature>"}'
+
+# SM4 密钥 + 加解密（加密可不传 iv，服务端随机生成并返回）
+curl -X POST http://localhost:8080/api/gm/sm4/key
+
+curl -X POST http://localhost:8080/api/gm/sm4/encrypt \
+  -H 'Content-Type: application/json' \
+  -d '{"key":"<16 字节 hex 密钥>","plaintext":"hello-国密"}'
+
+curl -X POST http://localhost:8080/api/gm/sm4/decrypt \
+  -H 'Content-Type: application/json' \
+  -d '{"key":"<同一把 key>","ciphertext":"<密文>","iv":"<加密返回的 iv>"}'
+
+# SM3 摘要
+curl -X POST http://localhost:8080/api/gm/sm3/digest \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"hello-国密"}'
+```
+
+注意：
+
+- SM2 公钥是未压缩点 `04 || X || Y`（65 字节 hex）；私钥是 32 字节 D 值。
+- SM2 密文排列是国标常见的 **C1C3C2**。和只实现 C1C2C3 的库对不上时，先核对这一点。
+- SM2 签名默认 userId 为 ASCII `1234567812345678`（GM/T 0009）。
+- SM4 解密必须带上加密时的 **同一把 key + 同一个 iv**。
+
 ## 项目结构（每个文件做什么）
 
 ```text
@@ -155,6 +223,13 @@ java-demo/
         ├── DemoApplication.java     # 启动入口
         ├── HelloController.java     # GET /hello
         ├── GlobalExceptionHandler.java  # 统一错误 JSON
+        ├── gm/                      # 国密 SM2 / SM3 / SM4
+        │   ├── GmProviders.java          # 注册 BouncyCastle
+        │   ├── GmHex.java                # hex 编解码
+        │   ├── Sm2Service.java           # 密钥 / 加解密 / 签名验签
+        │   ├── Sm3Service.java           # 摘要
+        │   ├── Sm4Service.java           # 密钥 / 加解密
+        │   └── GmCryptoController.java   # HTTP 接口
         └── sample/                  # demo_sample 的 CRUD
             ├── DemoSample.java           # Entity ↔ 表
             ├── DemoSampleRepository.java # 数据访问
@@ -172,6 +247,7 @@ java-demo/
 | [`DemoSampleController.java`](src/main/java/com/example/demo/sample/DemoSampleController.java) | 路由与请求/响应 | Express Router / NestJS Controller |
 | [`DemoSampleRequest.java`](src/main/java/com/example/demo/sample/DemoSampleRequest.java) | 入参形状 + 校验 | zod schema / Request DTO |
 | [`GlobalExceptionHandler.java`](src/main/java/com/example/demo/GlobalExceptionHandler.java) | 把异常转成统一 JSON | Express error middleware |
+| [`gm/`](src/main/java/com/example/demo/gm) | 国密 SM2/SM3/SM4 练习（BouncyCastle） | Node `crypto` + 国密实现 |
 
 ## 请求怎么走到代码里
 
